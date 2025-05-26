@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>Edu Webhard</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <h1>Edu Webhard</h1>
+    <input type="password" id="password" placeholder="비밀번호 입력" />
+    <input type="file" id="fileInput" />
+    <button onclick="upload()">업로드</button>
+
+    <h2>업로드된 파일 목록</h2>
+    <ul id="fileList">로딩 중...</ul>
+  </div>
+  <script>
+    const owner = "Dani-dev-6";  // 본인 깃허브 사용자명으로 수정 필요
+    const repo = "edu_webhard";
+    const directory = "files";
+
+    function upload() {
+      const pw = document.getElementById("password").value;
+      if (pw !== "bydi6") {
+        alert("비밀번호가 틀렸습니다.");
+        return;
+      }
+      const fileInput = document.getElementById("fileInput");
+      const file = fileInput.files[0];
+      if (!file) {
+        alert("파일을 선택하세요.");
+        return;
+      }
+
+      const issueTitle = encodeURIComponent("[업로드] " + file.name);
+      const issueBody = encodeURIComponent(
+        `아래 파일을 업로드합니다.\n\n파일명: ${file.name}\n(파일을 첨부한 후 이슈를 제출해주세요)`
+      );
+      const url = `https://github.com/${owner}/${repo}/issues/new?title=${issueTitle}&body=${issueBody}`;
+      window.open(url, "_blank");
+    }
+
+    async function fetchFileList() {
+      const listEl = document.getElementById("fileList");
+      listEl.textContent = "로딩 중...";
+
+      try {
+        const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${directory}`);
+        if (!res.ok) {
+          listEl.textContent = "파일 목록을 불러올 수 없습니다.";
+          return;
+        }
+        const data = await res.json();
+
+        if (!Array.isArray(data) || data.length === 0) {
+          listEl.textContent = "업로드된 파일이 없습니다.";
+          return;
+        }
+
+        listEl.innerHTML = "";
+        data.forEach(file => {
+          if(file.type === "file"){
+            const li = document.createElement("li");
+            const a = document.createElement("a");
+            a.href = file.download_url;
+            a.textContent = file.name;
+            a.target = "_blank";
+            li.appendChild(a);
+            listEl.appendChild(li);
+          }
+        });
+      } catch (e) {
+        listEl.textContent = "오류가 발생했습니다.";
+      }
+    }
+
+    fetchFileList();
+  </script>
+</body>
+</html>
