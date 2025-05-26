@@ -1,0 +1,74 @@
+name: Upload from Issue
+
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  extract-upload:
+    runs-on: ubuntu-latest
+    if: contains(github.event.issue.title, '[업로드]')
+    steps:
+      - name: Check for attachment
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const issue_number = context.payload.issue.number;
+            const issue = await github.rest.issues.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number
+            });
+
+            const body = issue.data.body;
+            const attachmentRegex = /\\!\.*?\\(.*?)\/g;
+            const attachments = [...body.matchAll(attachmentRegex)];
+
+            if (attachments.length === 0) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number,
+                body: "⚠️ 첨부파일이 없습니다. 이슈에 파일을 첨부한 후 다시 시도해주세요."
+              });
+              return;
+            }
+
+            const url = attachments[0][1];
+            const filename = url.split('/').pop();
+            const res = await fetch(url);
+            const blob = await res.arrayBuffer();
+            const content = Buffer.from(blob).toString('base64');
+
+            const branch = 'upload-' + Date.now();
+            const latestCommit = await github.rest.repos.getCommit({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: 'heads/main'
+            });
+
+            await github.rest.git.createRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: `refs/heads/${branch}`,
+              sha: latestCommit.data.sha
+            });
+
+            await github.rest.repos.createOrUpdateFileContents({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              path: 'files/' + filename,
+              message: 'Upload ' + filename + ' from issue #' + issue_number,
+              content: content,
+              branch: branch
+            });
+
+            await github.rest.pulls.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: 'Upload ' + filename,
+              head: branch,
+              base: 'main',
+              body: '자동 업로드: issue #' + issue_number
+            });
