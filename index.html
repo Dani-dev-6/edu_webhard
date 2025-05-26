@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>edu_webhard</title>
+  <style>
+    body { font-family: sans-serif; padding: 2em; }
+    h1 { font-size: 24px; }
+    ul { list-style: none; padding: 0; }
+    li { margin: 0.5em 0; }
+    a { text-decoration: none; color: blue; }
+  </style>
+</head>
+<body>
+  <h1>파일 목록 (GitHub Issues 기반)</h1>
+  <ul id="file-list">불러오는 중...</ul>
+
+  <script>
+    const repoOwner = "Dani-dev-6";
+    const repoName = "edu_webhard";
+
+    async function fetchIssues() {
+      const res = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/issues`);
+      const issues = await res.json();
+
+      const fileLinks = [];
+
+      for (const issue of issues) {
+        if (!issue.title.includes("[업로드]")) continue;
+
+        const matchAll = [...issue.body.matchAll(/!\[.*?\]\((.*?)\)/g)];
+        for (const match of matchAll) {
+          const url = match[1];
+          const filename = decodeURIComponent(url.split("/").pop().split("?")[0]);
+          fileLinks.push({ name: filename, url });
+        }
+      }
+
+      const list = document.getElementById("file-list");
+      list.innerHTML = "";
+      if (fileLinks.length === 0) {
+        list.innerHTML = "<li>파일이 없습니다.</li>";
+      } else {
+        fileLinks.forEach(file => {
+          const li = document.createElement("li");
+          li.innerHTML = `<a href="${file.url}" target="_blank">${file.name}</a>`;
+          list.appendChild(li);
+        });
+      }
+    }
+
+    fetchIssues();
+  </script>
+</body>
+</html>
